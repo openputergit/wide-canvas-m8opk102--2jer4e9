@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textile Motif Analyzer Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .filter-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 4px;
+            margin: 2px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .filter-preview:hover {
+            transform: scale(1.1);
+        }
+        .image-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .image-container img {
+            transition: transform 0.3s ease;
+        }
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .mini-button {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .crop-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .crop-area {
+            position: absolute;
+            border: 2px dashed white;
+            cursor: move;
+            z-index: 11;
+        }
+        .crop-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            z-index: 12;
+        }
+        .adjustments-panel {
+            background: rgba(30, 41, 59, 0.95);
+            border-radius: 8px;
+            padding: 12px;
+            position: absolute;
+            right: -280px;
+            top: 0;
+            width: 260px;
+            height: 100%;
+            transition: right 0.3s ease;
+            z-index: 15;
+        }
+        .adjustments-panel.show {
+            right: -12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            background: #4b5563;
+            height: 6px;
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        
+        .filters-container {
+            display: none;
+            margin-top: 12px;
+            background: rgba(31, 41, 55, 0.7);
+            border-radius: 8px;
+            padding: 12px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Loading Overlay -->
+    <div class="loading" id="loadingOverlay">
+        <div class="text-center">
+            <i class="bi bi-arrow-repeat animate-spin text-4xl"></i>
+            <p class="mt-2">Processing...</p>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">Textile Motif Analyzer Pro</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Left Column - Original Image -->
+            <div class="bg-gray-800 p-6 rounded-lg relative">
+                <h2 class="text-xl font-semibold mb-4">Image Processing Lab</h2>
+                
+                <div class="space-y-4">
+                    <div class="image-container border-2 border-dashed border-blue-500 rounded-lg h-64 flex justify-center items-center relative">
+                        <input type="file" id="imageInput" accept="image/*" class="hidden">
+                        <img id="originalImage" class="max-h-full max-w-full hidden object-contain" style="transform-origin: center;">
+                        <div id="uploadPrompt" class="text-center">
+                            <i class="bi bi-cloud-upload text-4xl text-blue-500"></i>
+                            <p class="mt-2">Click to Upload Image</p>
+                        </div>
+                        
+                        <!-- Crop Overlay -->
+                        <div class="crop-overlay" id="cropOverlay">
+                            <div class="crop-area" id="cropArea">
+                                <div class="crop-handle" style="top: -5px; left: -5px;"></div>
+                                <div class="crop-handle" style="top: -5px; right: -5px;"></div>
+                                <div class="crop-handle" style="bottom: -5px; left: -5px;"></div>
+                                <div class="crop-handle" style="bottom: -5px; right: -5px;"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Adjustments Panel -->
+                        <div class="adjustments-panel" id="adjustmentsPanel">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-semibold">Image Adjustments</h3>
+                                <button id="closeAdjustments" class="text-gray-400 hover:text-white">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Brightness</span>
+                                    <span id="brightnessValue">100%</span>
+                                </div>
+                                <input type="range" id="brightnessSlider" min="0" max="200" value="100">
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Contrast</span>
+                                    <span id="contrastValue">100%</span>
+                                </div>
+                                <input type="range" id="contrastSlider" min="0" max="200" value="100">
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Saturation</span>
+                                    <span id="saturationValue">100%</span>
+                                </div>
+                                <input type="range" id="saturationSlider" min="0" max="200" value="100">
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Sharpen</span>
+                                    <span id="sharpenValue">0%</span>
+                                </div>
+                                <input type="range" id="sharpenSlider" min="0" max="10" value="0">
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Structure</span>
+                                    <span id="structureValue">0%</span>
+                                </div>
+                                <input type="range" id="structureSlider" min="0" max="100" value="0">
+                            </div>
+                            
+                            <div class="slider-container">
+                                <div class="slider-label">
+                                    <span>Warmth</span>
+                                    <span id="warmthValue">0%</span>
+                                </div>
+                                <input type="range" id="warmthSlider" min="-100" max="100" value="0">
+                            </div>
+                            
+                            <button id="resetAdjustments" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded mt-3 mb-3">
+                                Reset Adjustments
+                            </button>
+                            
+                            <button id="applyAdjustments" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
+                                Apply Adjustments
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Controls -->
+                    <div class="flex flex-wrap gap-2">
+                        <button id="uploadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+                            <i class="bi bi-upload"></i> Upload Image
+                        </button>
+                        <button id="cropBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded" disabled>
+                            <i class="bi bi-crop"></i> Crop Image
+                        </button>
+                        <button id="bgRemoveBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded" disabled>
+                            <i class="bi bi-eraser"></i> Remove Background
+                        </button>
+                        <button id="preprocessBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded" disabled>
+                            <i class="bi bi-gear"></i> Preprocess Image
+                        </button>
+                    </div>
+
+                    <!-- Image Manipulation Controls -->
+                    <div class="flex flex-wrap gap-2">
+                        <button id="rotateLeftBtn" class="mini-button bg-gray-600 hover:bg-gray-700 rounded" disabled>
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button id="rotateRightBtn" class="mini-button bg-gray-600 hover:bg-gray-700 rounded" disabled>
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button id="flipHorizontalBtn" class="mini-button bg-gray-600 hover:bg-gray-700 rounded" disabled>
+                            <i class="bi bi-arrows-expand-h"></i>
+                        </button>
+                        <button id="flipVerticalBtn" class="mini-button bg-gray-600 hover:bg-gray-700 rounded" disabled>
+                            <i class="bi bi-arrows-expand"></i>
+                        </button>
+                        <button id="undoBtn" class="mini-button bg-red-600 hover:bg-red-700 rounded" disabled>
+                            <i class="bi bi-arrow-counterclockwise"></i> Undo
+                        </button>
+                        <button id="adjustBtn" class="mini-button bg-blue-600 hover:bg-blue-700 rounded" disabled>
+                            <i class="bi bi-sliders"></i> Adjust
+                        </button>
+                    </div>
+
+                    <!-- Filters Section -->
+                    <div id="filtersSection" class="filters-container">
+                        <h3 class="text-sm font-semibold mb-2">Image Filters</h3>
+                        <div class="filter-buttons">
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="none">Normal</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="grayscale">B&W</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="sepia">Sepia</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="contrast">Contrast</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="brightness">Bright</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="invert">Negative</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="saturate">Saturate</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="blur">Blur</button>
+                            <button class="filter-btn mini-button bg-indigo-600 hover:bg-indigo-700 rounded" data-filter="hue-rotate">Color Shift</button>
+                        </div>
+                    </div>
+
+                    <button id="confirmBtn" class="hidden bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded w-full">
+                        <i class="bi bi-check-circle"></i> Confirm Changes
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column - Processed Image -->
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Processed Result</h2>
+                <div class="border-2 border-dashed border-green-500 rounded-lg h-64 flex justify-center items-center">
+                    <img id="processedImage" class="max-h-full max-w-full hidden object-contain">
+                    <p id="processedPrompt">Processed image will appear here</p>
+                </div>
+
+                <div class="mt-4">
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2">Analysis Result</h3>
+                        <div id="predictionResult" class="text-sm">
+                            No analysis available yet
+                        </div>
+                    </div>
+                    
+                    <button id="predictBtn" class="mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded w-full" disabled>
+                        <i class="bi bi-lightning"></i> Analyze Pattern
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentImage = null;
+        let imageHistory = [];
+        let isConfirmed = false;
+        let currentRotation = 0;
+        let currentFlipH = 1;
+        let currentFlipV = 1;
+        let currentFilters = {
+            brightness: 100,
+            contrast: 100,
+            saturation: 100,
+            sharpen: 0,
+            structure: 0,
+            warmth: 0,
+            filter: 'none'
+        };
+        let isCropping = false;
+        let cropStartX, cropStartY;
+        
+        // Initialize UI elements
+        const elements = {
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            uploadBtn: document.getElementById('uploadBtn'),
+            imageInput: document.getElementById('imageInput'),
+            originalImage: document.getElementById('originalImage'),
+            uploadPrompt: document.getElementById('uploadPrompt'),
+            cropBtn: document.getElementById('cropBtn'),
+            bgRemoveBtn: document.getElementById('bgRemoveBtn'),
+            preprocessBtn: document.getElementById('preprocessBtn'),
+            predictBtn: document.getElementById('predictBtn'),
+            processedImage: document.getElementById('processedImage'),
+            processedPrompt: document.getElementById('processedPrompt'),
+            predictionResult: document.getElementById('predictionResult'),
+            confirmBtn: document.getElementById('confirmBtn'),
+            rotateLeftBtn: document.getElementById('rotateLeftBtn'),
+            rotateRightBtn: document.getElementById('rotateRightBtn'),
+            flipHorizontalBtn: document.getElementById('flipHorizontalBtn'),
+            flipVerticalBtn: document.getElementById('flipVerticalBtn'),
+            undoBtn: document.getElementById('undoBtn'),
+            adjustBtn: document.getElementById('adjustBtn'),
+            cropOverlay: document.getElementById('cropOverlay'),
+            cropArea: document.getElementById('cropArea'),
+            adjustmentsPanel: document.getElementById('adjustmentsPanel'),
+            closeAdjustments: document.getElementById('closeAdjustments'),
+            filtersSection: document.getElementById('filtersSection'),
+            applyAdjustments: document.getElementById('applyAdjustments'),
+            resetAdjustments: document.getElementById('resetAdjustments'),
+            
+            // Sliders
+            brightnessSlider: document.getElementById('brightnessSlider'),
+            contrastSlider: document.getElementById('contrastSlider'),
+            saturationSlider: document.getElementById('saturationSlider'),
+            sharpenSlider: document.getElementById('sharpenSlider'),
+            structureSlider: document.getElementById('structureSlider'),
+            warmthSlider: document.getElementById('warmthSlider'),
+            
+            // Values displays
+            brightnessValue: document.getElementById('brightnessValue'),
+            contrastValue: document.getElementById('contrastValue'),
+            saturationValue: document.getElementById('saturationValue'),
+            sharpenValue: document.getElementById('sharpenValue'),
+            structureValue: document.getElementById('structureValue'),
+            warmthValue: document.getElementById('warmthValue')
+        };
+
+        // Initialize crop functionality
+        function initializeCrop() {
+            const cropArea = elements.cropArea;
+            let isResizing = false;
+            let resizeHandle = null;
+            
+            // Set initial size of crop area
+            cropArea.style.width = '50%';
+            cropArea.style.height = '50%';
+            cropArea.style.left = '25%';
+            cropArea.style.top = '25%';
+            
+            // Move crop area
+            cropArea.addEventListener('mousedown', (e) => {
+                if (e.target !== cropArea) return; // Don't handle if click was on a handle
+                
+                e.preventDefault();
+                cropStartX = e.clientX - cropArea.getBoundingClientRect().left;
+                cropStartY = e.clientY - cropArea.getBoundingClientRect().top;
+                
+                document.addEventListener('mousemove', moveCropArea);
+                document.addEventListener('mouseup', stopMovingCropArea);
+            });
+            
+            // Resize crop area
+            const handles = document.querySelectorAll('.crop-handle');
+            handles.forEach(handle => {
+                handle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    isResizing = true;
+                    resizeHandle = handle;
+                    
+                    document.addEventListener('mousemove', resizeCropArea);
+                    document.addEventListener('mouseup', stopResizingCropArea);
+                });
+            });
+            
+            function moveCropArea(e) {
+                const container = elements.cropOverlay.getBoundingClientRect();
+                const cropRect = cropArea.getBoundingClientRect();
+                
+                let left = e.clientX - cropStartX - container.left;
+                let top = e.clientY - cropStartY - container.top;
+                
+                // Constrain within bounds
+                left = Math.max(0, Math.min(left, container.width - cropRect.width));
+                top = Math.max(0, Math.min(top, container.height - cropRect.height));
+                
+                cropArea.style.left = `${left}px`;
+                cropArea.style.top = `${top}px`;
+            }
+            
+            function resizeCropArea(e) {
+                const container = elements.cropOverlay.getBoundingClientRect();
+                const cropRect = cropArea.getBoundingClientRect();
+                const position = resizeHandle.style;
+                
+                // Calculate new dimensions based on which handle is being dragged
+                let newWidth, newHeight, newLeft, newTop;
+                
+                if (position.top === "-5px" && position.left === "-5px") {
+                    // Top-left handle
+                    newWidth = cropRect.right - e.clientX;
+                    newHeight = cropRect.bottom - e.clientY;
+                    newLeft = e.clientX - container.left;
+                    newTop = e.clientY - container.top;
+                } else if (position.top === "-5px" && position.right === "-5px") {
+                    // Top-right handle
+                    newWidth = e.clientX - cropRect.left;
+                    newHeight = cropRect.bottom - e.clientY;
+                    newLeft = cropRect.left - container.left;
+                    newTop = e.clientY - container.top;
+                } else if (position.bottom === "-5px" && position.left === "-5px") {
+                    // Bottom-left handle
+                    newWidth = cropRect.right - e.clientX;
+                    newHeight = e.clientY - cropRect.top;
+                    newLeft = e.clientX - container.left;
+                    newTop = cropRect.top - container.top;
+                } else if (position.bottom === "-5px" && position.right === "-5px") {
+                    // Bottom-right handle
+                    newWidth = e.clientX - cropRect.left;
+                    newHeight = e.clientY - cropRect.top;
+                    newLeft = cropRect.left - container.left;
+                    newTop = cropRect.top - container.top;
+                }
+                
+                // Apply new dimensions if valid
+                if (newWidth > 20 && newHeight > 20) {
+                    cropArea.style.width = `${newWidth}px`;
+                    cropArea.style.height = `${newHeight}px`;
+                    cropArea.style.left = `${newLeft}px`;
+                    cropArea.style.top = `${newTop}px`;
+                }
+            }
+            
+            function stopMovingCropArea() {
+                document.removeEventListener('mousemove', moveCropArea);
+                document.removeEventListener('mouseup', stopMovingCropArea);
+            }
+            
+            function stopResizingCropArea() {
+                isResizing = false;
+                document.removeEventListener('mousemove', resizeCropArea);
+                document.removeEventListener('mouseup', stopResizingCropArea);
+            }
+        }
+        
+        // Image manipulation functions
+        function rotateImage(direction) {
+            if (isConfirmed) return;
+            currentRotation += direction === 'left' ? -90 : 90;
+            elements.originalImage.style.transform = 
+                `rotate(${currentRotation}deg) scale(${currentFlipH}, ${currentFlipV})`;
+            updateProcessedImage();
+        }
+
+        function flipImage(direction) {
+            if (isConfirmed) return;
+            if (direction === 'horizontal') currentFlipH *= -1;
+            if (direction === 'vertical') currentFlipV *= -1;
+            elements.originalImage.style.transform = 
+                `rotate(${currentRotation}deg) scale(${currentFlipH}, ${currentFlipV})`;
+            updateProcessedImage();
+        }
+
+        function updateProcessedImage() {
+            if (elements.processedImage.src) {
+                elements.processedImage.style.transform = 
+                    `rotate(${currentRotation}deg) scale(${currentFlipH}, ${currentFlipV})`;
+                
+                // Also apply the same filters
+                applyFilters(elements.processedImage);
+            }
+        }
+        
+        function applyFilters(imgElement) {
+            let filterString = '';
+            
+            // Apply CSS filters
+            if (currentFilters.filter !== 'none') {
+                switch(currentFilters.filter) {
+                    case 'grayscale': filterString += 'grayscale(100%) '; break;
+                    case 'sepia': filterString += 'sepia(100%) '; break;
+                    case 'contrast': filterString += 'contrast(150%) '; break;
+                    case 'brightness': filterString += 'brightness(150%) '; break;
+                    case 'invert': filterString += 'invert(100%) '; break;
+                    case 'saturate': filterString += 'saturate(200%) '; break;
+                    case 'blur': filterString += 'blur(3px) '; break;
+                    case 'hue-rotate': filterString += 'hue-rotate(180deg) '; break;
+                }
+            }
+            
+            // Apply slider-based adjustments
+            filterString += `brightness(${currentFilters.brightness}%) `;
+            filterString += `contrast(${currentFilters.contrast}%) `;
+            filterString += `saturate(${currentFilters.saturation}%) `;
+            
+            // For sharpen, structure and warmth, we'll use a CSS filter approximation
+            if (currentFilters.sharpen > 0) {
+                // Approximation of sharpening with contrast
+                let sharpValue = 1 + (currentFilters.sharpen / 10);
+                filterString += `contrast(${sharpValue}) `;
+            }
+            
+            if (currentFilters.structure > 0) {
+                // Approximation with clarity-like effect
+                filterString += `contrast(${100 + currentFilters.structure * 0.3}%) `;
+            }
+            
+            if (currentFilters.warmth !== 0) {
+                // Approximation of warmth with sepia for warm and hue-rotate for cool
+                if (currentFilters.warmth > 0) {
+                    filterString += `sepia(${currentFilters.warmth}%) `;
+                } else {
+                    filterString += `hue-rotate(${Math.abs(currentFilters.warmth / 2)}deg) `;
+                }
+            }
+            
+            imgElement.style.filter = filterString;
+        }
+
+        // Event Listeners for Image Manipulation
+        elements.rotateLeftBtn.addEventListener('click', () => rotateImage('left'));
+        elements.rotateRightBtn.addEventListener('click', () => rotateImage('right'));
+        elements.flipHorizontalBtn.addEventListener('click', () => flipImage('horizontal'));
+        elements.flipVerticalBtn.addEventListener('click', () => flipImage('vertical'));
+
+        // Crop functionality
+        elements.cropBtn.addEventListener('click', () => {
+            if (isConfirmed) return;
+            isCropping = !isCropping;
+            
+            if (isCropping) {
+                elements.cropOverlay.style.display = 'flex';
+                elements.cropBtn.classList.add('bg-red-600');
+                elements.cropBtn.classList.remove('bg-green-600');
+                elements.cropBtn.innerHTML = '<i class="bi bi-x"></i> Cancel Crop';
+                
+                // Initialize crop area
+                initializeCrop();
+            } else {
+                elements.cropOverlay.style.display = 'none';
+                elements.cropBtn.classList.add('bg-green-600');
+                elements.cropBtn.classList.remove('bg-red-600');
+                elements.cropBtn.innerHTML = '<i class="bi bi-crop"></i> Crop Image';
+            }
+        });
+        
+        // Background removal functionality (simulation)
+        elements.bgRemoveBtn.addEventListener('click', () => {
+            if (isConfirmed) return;
+            
+            elements.loadingOverlay.style.display = 'flex';
+            
+            // Simulate background removal with a timeout
+            setTimeout(() => {
+                // In a real app, you would call an API here or use canvas to remove background
+                // For now, we'll just simulate it
+                saveImageToHistory();
+                
+                // Show result
+                elements.loadingOverlay.style.display = 'none';
+                elements.processedPrompt.classList.add('hidden');
+                elements.processedImage.classList.remove('hidden');
+                
+                alert("Background removal simulated! In a real app, this would remove the image background.");
+            }, 1500);
+        });
+        
+        // Adjustments panel functionality
+        elements.adjustBtn.addEventListener('click', () => {
+            if (isConfirmed) return;
+            elements.adjustmentsPanel.classList.add('show');
+        });
+        
+        elements.closeAdjustments.addEventListener('click', () => {
+            elements.adjustmentsPanel.classList.remove('show');
+        });
+        
+        // Preprocess button shows filter options
+        elements.preprocessBtn.addEventListener('click', () => {
+            if (isConfirmed) return;
+            elements.filtersSection.style.display = 'block';
+        });
+        
+        // Reset adjustments button
+        elements.resetAdjustments.addEventListener('click', () => {
+            // Reset all sliders to default values
+            elements.brightnessSlider.value = 100;
+            elements.contrastSlider.value = 100;
+            elements.saturationSlider.value = 100;
+            elements.sharpenSlider.value = 0;
+            elements.structureSlider.value = 0;
+            elements.warmthSlider.value = 0;
+            
+            // Update displayed values
+            elements.brightnessValue.textContent = '100%';
+            elements.contrastValue.textContent = '100%';
+            elements.saturationValue.textContent = '100%';
+            elements.sharpenValue.textContent = '0%';
+            elements.structureValue.textContent = '0%';
+            elements.warmthValue.textContent = '0%';
+            
+            // Reset filter values in currentFilters
+            currentFilters.brightness = 100;
+            currentFilters.contrast = 100;
+            currentFilters.saturation = 100;
+            currentFilters.sharpen = 0;
+            currentFilters.structure = 0;
+            currentFilters.warmth = 0;
+            currentFilters.filter = 'none';
+            
+            // Apply these reset filters
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        // Apply adjustments (acts as global confirm button)
+        elements.applyAdjustments.addEventListener('click', () => {
+            elements.adjustmentsPanel.classList.remove('show');
+            isConfirmed = true;
+            elements.confirmBtn.classList.add('hidden');
+            
+            // Disable editing buttons
+            elements.cropBtn.disabled = true;
+            elements.bgRemoveBtn.disabled = true;
+            elements.preprocessBtn.disabled = true;
+            elements.rotateLeftBtn.disabled = true;
+            elements.rotateRightBtn.disabled = true;
+            elements.flipHorizontalBtn.disabled = true;
+            elements.flipVerticalBtn.disabled = true;
+            elements.undoBtn.disabled = true;
+            elements.adjustBtn.disabled = true;
+            
+            // Enable predict button
+            elements.predictBtn.disabled = false;
+            
+            alert('Changes confirmed. You can now analyze the pattern.');
+        });
+        
+        // Slider event listeners
+        elements.brightnessSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.brightnessValue.textContent = `${value}%`;
+            currentFilters.brightness = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        elements.contrastSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.contrastValue.textContent = `${value}%`;
+            currentFilters.contrast = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        elements.saturationSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.saturationValue.textContent = `${value}%`;
+            currentFilters.saturation = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        elements.sharpenSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.sharpenValue.textContent = `${value}%`;
+            currentFilters.sharpen = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        elements.structureSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.structureValue.textContent = `${value}%`;
+            currentFilters.structure = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+        
+        elements.warmthSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            elements.warmthValue.textContent = `${value}%`;
+            currentFilters.warmth = value;
+            applyFilters(elements.originalImage);
+            applyFilters(elements.processedImage);
+        });
+
+        // Undo functionality
+        elements.undoBtn.addEventListener('click', () => {
+            if (isConfirmed || imageHistory.length === 0) return;
+            currentImage = imageHistory.pop();
+            elements.originalImage.src = currentImage;
+            elements.processedImage.src = currentImage;
+            // Reset transformations
+            currentRotation = 0;
+            currentFlipH = 1;
+            currentFlipV = 1;
+            elements.originalImage.style.transform = 'none';
+            elements.processedImage.style.transform = 'none';
+            
+            // Reset filters too
+            elements.originalImage.style.filter = 'none';
+            elements.processedImage.style.filter = 'none';
+        });
+
+        // Helper function to save state to history
+        function saveImageToHistory() {
+            if (currentImage) {
+                imageHistory.push(currentImage);
+                // In a real app, you would save the edited image here
+                // For simulation, we'll just update the UI
+            }
+        }
+        
+        // Filter functionality
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isConfirmed) return;
+                const filter = btn.dataset.filter;
+                currentFilters.filter = filter;
+                applyFilters(elements.originalImage);
+                applyFilters(elements.processedImage);
+            });
+        });
+
+        // Main functionality (upload, crop, process, etc.)
+        elements.uploadBtn.addEventListener('click', () => elements.imageInput.click());
+        
+        elements.imageInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentImage = e.target.result;
+                    imageHistory.push(currentImage);
+                    elements.originalImage.src = currentImage;
+                    elements.originalImage.classList.remove('hidden');
+                    elements.uploadPrompt.classList.add('hidden');
+                    elements.processedImage.src = currentImage;
+                    elements.processedImage.classList.remove('hidden');
+                    elements.processedPrompt.classList.add('hidden');
+                    
+                    // Enable buttons
+                    elements.cropBtn.disabled = false;
+                    elements.bgRemoveBtn.disabled = false;
+                    elements.preprocessBtn.disabled = false;
+                    elements.rotateLeftBtn.disabled = false;
+                    elements.rotateRightBtn.disabled = false;
+                    elements.flipHorizontalBtn.disabled = false;
+                    elements.flipVerticalBtn.disabled = false;
+                    elements.undoBtn.disabled = false;
+                    elements.adjustBtn.disabled = false;
+                    
+                    elements.confirmBtn.classList.remove('hidden');
+                    isConfirmed = false;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+
+        // Confirm changes button
+        elements.confirmBtn.addEventListener('click', () => {
+            isConfirmed = true;
+            elements.confirmBtn.classList.add('hidden');
+            
+            // Disable editing buttons
+            elements.cropBtn.disabled = true;
+            elements.bgRemoveBtn.disabled = true;
+            elements.preprocessBtn.disabled = true;
+            elements.rotateLeftBtn.disabled = true;
+            elements.rotateRightBtn.disabled = true;
+            elements.flipHorizontalBtn.disabled = true;
+            elements.flipVerticalBtn.disabled = true;
+            elements.undoBtn.disabled = true;
+            elements.adjustBtn.disabled = true;
+            
+            // Enable predict button
+            elements.predictBtn.disabled = false;
+            
+            alert('Changes confirmed. You can now analyze the pattern.');
+        });
+        
+        // Analysis button functionality
+        elements.predictBtn.addEventListener('click', () => {
+            elements.loadingOverlay.style.display = 'flex';
+            
+            // Simulate analysis with a timeout
+            setTimeout(() => {
+                // In a real app, this would send the image to an API for analysis
+                elements.predictionResult.innerHTML = `
+                    <div class="mb-2"><strong>Class:</strong> Batik Pattern</div>
+                    <div class="mb-2"><strong>Confidence:</strong> 96.8%</div>
+                    <div class="mb-1"><strong>Related Patterns:</strong></div>
+                    <ul class="list-disc ml-5">
+                        <li>Indonesian Batik</li>
+                        <li>Traditional Textile</li>
+                        <li>Cultural Heritage Pattern</li>
+                    </ul>
+                `;
+                
+                elements.loadingOverlay.style.display = 'none';
+            }, 2000);
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
